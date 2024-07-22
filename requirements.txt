@@ -2,4 +2,4 @@ fastapi
 python-dotenv
 uvicorn
 pydantic
-fluent-logger
+elasticsearch

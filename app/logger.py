@@ -1,27 +1,21 @@
+from elasticsearch import Elasticsearch
 import logging
 import os
-from fluent import handler as fluent_handler
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+es = Elasticsearch([os.getenv("ELASTICSEARCH_URL")])
 
-logger = logging.getLogger('app')
+class ElasticsearchHandler(logging.Handler):
+    def __init__(self, es_client, index_name):
+        super().__init__()
+        self.es_client = es_client
+        self.index_name = index_name
 
-fluent_host = os.getenv("FLUENTD_HOST", "localhost")
-fluent_port = int(os.getenv("FLUENTD_PORT", 24224))
-fluent_tag = os.getenv("FLUENTD_TAG", "app")
+    def emit(self, record):
+        log_entry = self.format(record)
+        self.es_client.index(index=self.index_name, body={'message': log_entry})
 
-fluentd_handler = fluent_handler.FluentHandler(fluent_tag, host=fluent_host, port=fluent_port)
-formatter = fluent_handler.FluentRecordFormatter({
-    'host': '%(hostname)s',
-    'where': '%(module)s.%(funcName)s',
-    'type': '%(levelname)s',
-    'stack_trace': '%(exc_text)s',
-})
-fluentd_handler.setFormatter(formatter)
-
-logger.addHandler(fluentd_handler)
-
-stream_handler = logging.StreamHandler()
-stream_handler.setLevel(logging.INFO)
-stream_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-logger.addHandler(stream_handler)
+logger = logging.getLogger('email_service')
+logger.setLevel(logging.INFO)
+es_handler = ElasticsearchHandler(es, 'logs')
+es_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+logger.addHandler(es_handler)
